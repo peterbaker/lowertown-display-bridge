@@ -1,0 +1,8 @@
+node_modules/
+config.json
+drop/
+*.jpg
+*.jpeg
+*.png
+*.bmp
+.env

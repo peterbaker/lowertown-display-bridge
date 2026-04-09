@@ -1,0 +1,16 @@
+{
+  "display": {
+    "host": "10.0.0.45",
+    "pin": "454545",
+    "timezone": "America/Detroit"
+  },
+  "images": {
+    "dir": "/home/pi/display-drop",
+    "width": 1440,
+    "height": 2560
+  },
+  "sync": {
+    "remote": "gdrive:Lowertown Display",
+    "intervalSeconds": 60
+  }
+}

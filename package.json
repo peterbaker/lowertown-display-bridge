@@ -1,0 +1,16 @@
+{
+  "name": "lowertown-display-bridge",
+  "version": "1.0.0",
+  "description": "Raspberry Pi bridge: syncs images from Google Drive and pushes them to the Samsung EM32DX e-paper display at Lowertown on a filename-based schedule.",
+  "type": "module",
+  "main": "bridge.js",
+  "scripts": {
+    "start": "node bridge.js start",
+    "push": "node bridge.js push",
+    "status": "node bridge.js status"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.0",
+    "sharp": "^0.33.0"
+  }
+}
