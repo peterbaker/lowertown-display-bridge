@@ -1,0 +1,10 @@
+[Unit]
+Description=Poll Google Drive for display images every 60 seconds
+Documentation=https://github.com/peterbaker/lowertown-display-bridge
+
+[Timer]
+OnBootSec=30
+OnUnitActiveSec=60
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,22 @@
+[Unit]
+Description=Lowertown Display Bridge
+Documentation=https://github.com/peterbaker/lowertown-display-bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+Environment=TZ=America/Detroit
+Environment=NODE_ENV=production
+WorkingDirectory=/home/pi/display-bridge
+ExecStart=/usr/bin/node bridge.js start
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=display-bridge
+
+[Install]
+WantedBy=multi-user.target
