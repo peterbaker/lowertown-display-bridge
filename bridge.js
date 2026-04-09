@@ -168,9 +168,9 @@ switch (command) {
     for (let i = 0; i < sorted.length - 1; i++) {
       const aMin = parseInt(sorted[i].slice(0, 2), 10) * 60 + parseInt(sorted[i].slice(2), 10);
       const bMin = parseInt(sorted[i + 1].slice(0, 2), 10) * 60 + parseInt(sorted[i + 1].slice(2), 10);
-      if (bMin - aMin < 10) {
+      if (bMin - aMin < 2) {
         console.log(
-          `\n  ⚠ Slots ${sorted[i]} and ${sorted[i + 1]} are < 10 min apart — ` +
+          `\n  ⚠ Slots ${sorted[i]} and ${sorted[i + 1]} are < 2 min apart — ` +
           `${sorted[i + 1]} will be skipped by the gap rule`
         );
       }
