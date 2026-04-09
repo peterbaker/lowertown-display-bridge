@@ -7,3 +7,4 @@ drop/
 *.bmp
 .env
 .DS_Store
+.expired

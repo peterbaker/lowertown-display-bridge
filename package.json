@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node bridge.js start",
     "push": "node bridge.js push",
-    "status": "node bridge.js status"
+    "status": "node bridge.js status",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "chokidar": "^4.0.0",
