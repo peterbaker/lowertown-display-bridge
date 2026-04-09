@@ -6,7 +6,7 @@ Raspberry Pi bridge that syncs images from Google Drive and pushes them to the S
 
 ## How It Works
 
-Drop an image file into the **"Lowertown Display"** Google Drive folder. Within 60 seconds, the Pi picks it up and either pushes it immediately or schedules it based on the filename.
+Drop an image file into the **"Lowertown Display"** Google Drive folder (`pete@lowertowna2.com`). Within 60 seconds, the Pi picks it up and either pushes it immediately or schedules it based on the filename.
 
 ### Filename scheduling
 
@@ -17,11 +17,11 @@ Drop an image file into the **"Lowertown Display"** Google Drive folder. Within 
 | 3 — Daily | `THHMM[-desc].ext` | `T1100-standard-lunch.jpg` | Every day at 11:00 AM |
 | 4 — Immediate | *(anything else)* | `spring-menu.jpg` | Pushed the moment it arrives |
 
-**Priority cascade**: Tier 1 > Tier 2 > Tier 3 at any given time slot. If two files compete in the same tier, the alphabetically first filename wins.
+**Priority cascade**: Tier 1 > Tier 2 > Tier 3 at any given time slot. Same-tier ties go to the alphabetically first filename.
 
 **DOW values**: `MON TUE WED THU FRI SAT SUN` (case-insensitive in filename)
 
-**10-minute gap rule**: Scheduled pushes (tiers 1–3) must be at least 10 minutes apart — the e-paper display takes up to a minute to refresh. Immediate (tier 4) pushes bypass this rule.
+**10-minute gap rule**: Scheduled pushes (tiers 1–3) must be at least 10 minutes apart — the e-paper display takes up to a minute to refresh. Tier-4 immediate pushes bypass this rule.
 
 ---
 
@@ -40,9 +40,9 @@ Download from **raspberrypi.com/software** and install it on your Mac. It's a fr
 3. **Raspberry Pi Device** → choose your Pi model (Pi 4 or Pi 5)
 4. **Operating System** → scroll down to "Raspberry Pi OS (other)" → choose **Raspberry Pi OS Lite (64-bit)** — no desktop needed
 5. **Storage** → select your SD card
-6. Click **Next**, then when asked "Would you like to apply OS customisation settings?" click **Edit Settings**
+6. Click **Next**, then when asked about customisation settings click **Edit Settings**
 
-In the customisation dialog, fill in:
+In the customisation dialog:
 
 | Setting | Value |
 |---------|-------|
@@ -54,36 +54,24 @@ In the customisation dialog, fill in:
 | Set locale / timezone | `America/Detroit` |
 | Keyboard layout | `us` |
 
-Switch to the **Services** tab:
-- Enable SSH: **Use password authentication** (switch to key-only after first boot)
+Switch to the **Services** tab → Enable SSH → **Use password authentication**
 
-Click **Save**, then **Yes** to apply settings. Click **Yes** to confirm writing (this erases the card). Wait for it to finish — about 3–5 minutes.
-
-Eject the card and insert it into the Pi.
+Click **Save** → **Yes** → **Yes** to write. Takes ~3–5 minutes. Eject and insert into Pi.
 
 ---
 
 ## Part 2 — First Boot & Remote Access
 
-### Power on and connect
+### Power on and SSH in
 
-Connect the Pi to Ethernet if possible (strongly preferred over WiFi — immune to password changes). Power it on. Wait 60–90 seconds.
+Connect the Pi to Ethernet if possible. Power it on. Wait 60–90 seconds, then from your Mac:
 
-From your Mac:
 ```bash
 ssh pi@lowertown-pi.local
 # Enter the password you set in Imager
 ```
 
-If `lowertown-pi.local` doesn't resolve, find the Pi's IP in your router's DHCP table and use that directly.
-
-### DHCP reservations (do this now, before the bar)
-
-In your router's admin page, reserve fixed IPs for both devices by MAC address:
-- **Pi** — run `ip link show eth0` on the Pi to get its MAC
-- **Display** — find its MAC in the Samsung E-Paper app settings
-
-Without reservations, a router reboot could silently break `config.json`.
+If `lowertown-pi.local` doesn't resolve, find the Pi's IP in your router's DHCP table.
 
 ### Install Tailscale (remote SSH from anywhere)
 
@@ -93,121 +81,167 @@ curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up
 ```
 
-Open the printed URL on your Mac/phone to authenticate the Pi into your tailnet. Once joined, you can SSH from anywhere:
+Open the printed URL on your Mac/phone to authenticate. Once joined, SSH works from anywhere — no `.local`, no port forwarding needed.
+
+### Set up a dedicated SSH key for the Pi (no passphrase)
+
+Create a key specifically for the Pi on your Mac:
 
 ```bash
-ssh pi@lowertown-pi       # via Tailscale — no .local needed, no port forwarding
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_pi -N "" -C "pete@lowertown-pi"
+ssh-copy-id -i ~/.ssh/id_ed25519_pi.pub pi@lowertown-pi
 ```
 
-Add this to `~/.ssh/config` on your Mac for convenience:
+Add to `~/.ssh/config` on your Mac:
+
 ```
 Host lt-pi
     HostName lowertown-pi
     User pi
-    IdentityFile ~/.ssh/id_ed25519
+    IdentityFile ~/.ssh/id_ed25519_pi
 ```
 
-Then `ssh lt-pi` gets you in.
+Verify it works with no prompts:
+```bash
+ssh lt-pi
+```
 
-### Set up SSH key auth (disable password login)
+### Disable password auth on the Pi
+
+Once key login is confirmed working:
 
 ```bash
-# On your Mac
-ssh-keygen -t ed25519 -C "pete@lowertown-pi"   # skip if you already have a key
-ssh-copy-id pi@lowertown-pi
-
-# Verify key login works (should not prompt for password)
-ssh lt-pi
-
-# On the Pi — disable password auth
+# On the Pi
 sudo sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
 sudo systemctl restart sshd
 ```
 
+### DHCP reservations
+
+In your router, reserve fixed IPs for both devices by MAC address:
+- **Pi** — `ip link show eth0` on the Pi
+- **Display** — found in the Samsung E-Paper app settings
+
+Without reservations, a router reboot could silently break `config.json`.
+
 ---
 
-## Part 3 — Install the Bridge Software
+## Part 3 — Google Drive Setup
+
+The Pi syncs from a Google Drive folder using a **Service Account** — credentials that never expire and need no human interaction to renew.
+
+### Create the Drive folder
+
+In Google Drive (`pete@lowertowna2.com`): New → Folder → **"Lowertown Display"**. This is where you'll drop images from your Mac.
+
+### Create a Service Account
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com) signed in as `pete@lowertowna2.com`
+2. Create a project → name it **"Lowertown Display Bridge"**
+3. Search "Google Drive API" → Enable it
+4. IAM & Admin → Service Accounts → Create Service Account → name: `display-bridge`
+5. On the service account → Keys tab → Add Key → Create new key → **JSON** → downloads automatically
+
+> **Google Workspace org policy note**: If key creation is blocked by an org policy, go to IAM & Admin → Organization policies → search `iam.disableServiceAccountKeyCreation` → override it for this project as "Not enforced". You'll need the Organization Policy Administrator role — grant it to yourself at the organization level in IAM first.
+
+### Share the Drive folder with the service account
+
+- Copy the service account email (looks like `display-bridge@your-project.iam.gserviceaccount.com`)
+- In Google Drive, right-click "Lowertown Display" → Share → paste that email → **Viewer** → Share
+
+### Copy the key to the Pi
 
 ```bash
-# On the Pi (SSH'd in)
+# From your Mac (adjust filename to match what Google downloaded)
+scp ~/Downloads/display-bridge-*.json lt-pi:/home/pi/display-bridge/gdrive-key.json
+```
+
+Then on the Pi:
+```bash
+chmod 600 /home/pi/display-bridge/gdrive-key.json
+```
+
+---
+
+## Part 4 — Install the Bridge Software
+
+### Clone and run setup
+
+```bash
+# On the Pi
+sudo apt install -y git
 git clone https://github.com/peterbaker/lowertown-display-bridge.git /home/pi/display-bridge
 cd /home/pi/display-bridge
 sudo bash setup/setup.sh
 ```
 
-The setup script is idempotent — safe to re-run. It installs Node 20, Python tools, samsung-emdx, rclone, creates the drop directory, runs `npm ci`, and installs the systemd services.
+The setup script installs Node 20, Python tools, samsung-emdx, rclone, creates the drop directory, runs `npm ci`, and installs the systemd services.
 
-After it finishes, two manual steps remain (instructions are printed at the end):
+### Configure rclone
 
-### Manual step A: Configure rclone
+Run as the `pi` user (not root):
 
-First, get the Google Service Account JSON key onto the Pi:
-```bash
-# From your Mac
-scp ~/Downloads/display-bridge-key.json lt-pi:/home/pi/display-bridge/gdrive-key.json
-```
-
-Then configure rclone **as the `pi` user** (not root):
 ```bash
 rclone config
 # n) New remote
 # name: gdrive
-# Storage: Google Drive (option number varies — search for "drive")
+# Storage: Google Drive
 # client_id: (leave blank)
 # client_secret: (leave blank)
 # scope: 1 (full access)
 # service_account_file: /home/pi/display-bridge/gdrive-key.json
 # Edit advanced config? n
-# Use auto config? n  (headless Pi can't open a browser)
+# Use auto config? n  (headless — no browser)
 # Team Drive? n
 # Confirm with y
 ```
 
-Test it:
-```bash
-rclone lsd gdrive:
-# Should list folders in Drive including "Lowertown Display"
+Test the connection. The Drive folder is shared *with* the service account, so it requires `--drive-shared-with-me`:
 
-mkdir -p /home/pi/display-drop
-rclone sync gdrive:"Lowertown Display" /home/pi/display-drop --verbose
+```bash
+rclone lsd --drive-shared-with-me gdrive:
+# Should list "Lowertown Display"
+```
+
+Test the sync:
+```bash
+touch /home/pi/display-bridge/.expired   # required before first sync
+rclone sync "gdrive:Lowertown Display" /home/pi/display-drop --drive-shared-with-me --verbose
 ls /home/pi/display-drop/
 ```
 
-### Manual step B: Create config.json
+### Create config.json
 
 ```bash
 cp /home/pi/display-bridge/config.json.example /home/pi/display-bridge/config.json
 nano /home/pi/display-bridge/config.json
 ```
 
-Set `display.host` to the display's IP address and `display.pin` to its PIN. The display IP can be found with:
-```bash
-node bridge.js discover
-```
+Set `display.host` to the display's IP and `display.pin` to its PIN. If you don't have those yet (display is at the bar), leave the placeholder values for now — the daemon won't connect but dry-run mode still works for all home testing.
 
 ---
 
-## Part 4 — Home Testing Before Bar Deployment
+## Part 5 — Home Testing Before Bar Deployment
 
-Test everything at home first. Once it's at the bar, it has to work.
+Test everything at home first. Once the Pi is at the bar, it has to work.
 
 ### Phase A: Software-only test (no display required)
 
 ```bash
+cd /home/pi/display-bridge
+
 # 1. Force a Drive sync and verify files appear
 sudo systemctl start rclone-sync
 ls /home/pi/display-drop/
 
 # 2. Check today's resolved schedule
-cd /home/pi/display-bridge
 node bridge.js schedule
 
-# 3. Simulate a specific day (e.g., verify Monday DOW files)
+# 3. Simulate a specific day (verify Monday DOW files fire correctly)
 node bridge.js schedule --date 2026-04-13     # a Monday
 
-# 4. Run daemon in dry-run mode — watch logs
+# 4. Run daemon in dry-run mode — watch for "[DRY RUN] Would push X" at fire times
 node bridge.js start --dry-run
-# You should see timers set, and "[DRY RUN] Would push X" at fire times
 # Ctrl+C when satisfied
 
 # 5. Test a dry-run push of a specific image
@@ -218,10 +252,7 @@ sudo reboot
 # SSH back in after ~90 seconds
 journalctl -u display-bridge -n 30    # should show catch-up image identified
 
-# 7. Verify Tailscale survived the reboot
-tailscale status    # lowertown-pi should show as connected (from your Mac)
-
-# 8. Verify all services are running
+# 7. Verify all services survived the reboot
 systemctl is-active display-bridge rclone-sync.timer tailscaled
 # All three should say "active"
 ```
@@ -229,56 +260,54 @@ systemctl is-active display-bridge rclone-sync.timer tailscaled
 ### Phase B: Live test (display on same network as Pi)
 
 ```bash
-# 1. Discover the display on your home network
-node bridge.js discover       # note the IP
+cd /home/pi/display-bridge
 
-# 2. Update config.json with home network IP
+# 1. Find the display IP
+node bridge.js discover
+
+# 2. Update config.json with the home network display IP
 nano config.json
 
-# 3. Enable Network Standby on the display (REQUIRED — cannot fix remotely)
+# 3. Enable Network Standby (REQUIRED — cannot be fixed remotely if missed)
 node bridge.js network-standby on
-node bridge.js network-standby    # should return "ON"
+node bridge.js network-standby    # confirm returns "ON"
 
 # 4. Test a manual push
 node bridge.js push /home/pi/display-drop/some-image.jpg
-# Display should refresh (5–15 seconds)
+# Display should refresh in 5–15 seconds
 
-# 5. Verify status
-node bridge.js status
-
-# 6. Run daemon in live mode, watch a scheduled slot fire
+# 5. Run daemon live, watch a scheduled slot fire
 #    (drop a file like T1430-test.jpg if it's currently 2:28 PM)
 node bridge.js start
 
-# 7. Reboot and verify catch-up appears on the physical display
+# 6. Reboot and verify the catch-up image appears on the physical display
 sudo reboot
 ```
 
 ---
 
-## Part 5 — Bar Installation
+## Part 6 — Bar Installation
 
 What changes from home → bar: **only the display IP**. Everything else is identical.
 
 ### Checklist
 
-- [ ] Plug Pi into smart plug (TP-Link Kasa), smart plug into power outlet
-- [ ] Connect Pi to bar Ethernet (preferred) or confirm WiFi creds are set
+- [ ] Plug Pi into TP-Link Kasa smart plug → plug into power outlet
+- [ ] Connect Pi to bar Ethernet (preferred) or confirm bar WiFi credentials are set
 - [ ] Power on Pi, wait 90 seconds
-- [ ] `ssh lt-pi` from Mac (Tailscale should connect automatically)
-- [ ] `node bridge.js discover` — find display IP on bar network
+- [ ] `ssh lt-pi` from Mac (Tailscale connects automatically)
+- [ ] `cd /home/pi/display-bridge && node bridge.js discover` — find display IP
 - [ ] Reserve display IP in bar router DHCP (MAC → IP)
 - [ ] Reserve Pi IP in bar router DHCP (`ip link show eth0` for MAC)
-- [ ] `nano /home/pi/display-bridge/config.json` — update display IP
+- [ ] `nano config.json` — update `display.host`
 - [ ] `sudo systemctl restart display-bridge`
-- [ ] `node bridge.js network-standby on` — enable Network Standby
-- [ ] `node bridge.js network-standby` — confirm returns "ON"
+- [ ] `node bridge.js network-standby on` then `node bridge.js network-standby` → confirm "ON"
 - [ ] `node bridge.js push /home/pi/display-drop/<any-image>` — test push
 - [ ] Confirm image appears on display
 - [ ] `systemctl is-active display-bridge rclone-sync.timer tailscaled` — all "active"
-- [ ] Leave bar; verify Tailscale still shows `lowertown-pi` online
+- [ ] Leave bar; verify Tailscale still shows `lowertown-pi` online from your Mac
 
-**Network Standby** is the one setting that cannot be fixed remotely. Do not leave the bar without confirming it is ON.
+**Network Standby** is the one thing that cannot be fixed remotely. Do not leave the bar without confirming it is ON.
 
 **On-site time**: ~15–20 minutes.
 
@@ -286,18 +315,16 @@ What changes from home → bar: **only the display IP**. Everything else is iden
 
 ## Managing Content
 
-Drop images into the **"Lowertown Display"** folder in Google Drive (`pete@lowertowna2.com`). The Pi picks them up within 60 seconds.
-
-### Filename examples
+Drop images into **"Lowertown Display"** in Google Drive. The Pi picks them up within 60 seconds.
 
 ```
-spring-menu.jpg                        → shows immediately on arrival
-T1100-lunch.jpg                        → shows every day at 11:00 AM
-MON-T1100-monday-special.jpg           → shows every Monday at 11:00 AM (overrides daily)
-2026-05-17T1800-trivia-night.jpg       → shows May 17 at 6:00 PM only (overrides both)
+spring-menu.jpg                    → shows immediately on arrival
+T1100-lunch.jpg                    → every day at 11:00 AM
+MON-T1100-monday-special.jpg       → every Monday at 11:00 AM (overrides daily)
+2026-05-17T1800-trivia-night.jpg   → May 17 at 6:00 PM only (overrides both)
 ```
 
-Tier-1 dated files are automatically deleted from the Pi at midnight after their date passes. They remain in Google Drive as an archive.
+Tier-1 dated files are automatically deleted from the Pi at midnight after their date passes. The Drive copy is untouched.
 
 ---
 
@@ -330,16 +357,15 @@ journalctl -u display-bridge -n 50        # last 50 log lines
 journalctl -u rclone-sync --since today   # sync history
 ```
 
-### Is the Pi online without SSH?
+### Is the Pi online? (without SSH)
 
-Check Tailscale on your Mac: `tailscale status`. If `lowertown-pi` shows as connected, the Pi's OS is running. If offline, use the Kasa app to power-cycle it.
+`tailscale status` on your Mac — if `lowertown-pi` shows connected, the Pi is up. If offline, power-cycle via Kasa app.
 
 ### Pi completely unreachable (Tailscale offline)
 
-1. Open Kasa app on phone
-2. Toggle the smart plug off → wait 10 seconds → toggle on
-3. Wait 60–90 seconds for Pi to boot
-4. Tailscale reconnects automatically — verify in the Kasa/Tailscale apps
+1. Open Kasa app → toggle smart plug off → wait 10 seconds → toggle on
+2. Wait 60–90 seconds
+3. Tailscale reconnects automatically
 
 ### Force immediate Drive sync
 
@@ -348,13 +374,13 @@ ssh lt-pi
 sudo systemctl start rclone-sync
 ```
 
-### Display IP changed (after router reboot)
+### Display IP changed
 
 ```bash
 ssh lt-pi
 cd /home/pi/display-bridge
-node bridge.js discover          # find new IP
-nano config.json                 # update "host"
+node bridge.js discover
+nano config.json                          # update "host"
 sudo systemctl restart display-bridge
 ```
 
@@ -368,22 +394,14 @@ npm ci
 sudo systemctl restart display-bridge
 ```
 
-### Check tonight's schedule
-
-```bash
-ssh lt-pi && cd /home/pi/display-bridge && node bridge.js schedule
-```
-
 ---
 
 ## Development
 
 ```bash
-npm test          # run unit tests (59 tests, ~40ms)
-npm ci            # install deps from lockfile
+npm test     # 59 unit tests, ~40ms, no external framework
+npm ci       # install from lockfile
 ```
-
-Tests use Node.js built-in runner — no external framework. All use fixed reference dates so they never flake based on the current day.
 
 ---
 
@@ -394,7 +412,7 @@ Tests use Node.js built-in runner — no external framework. All use fixed refer
 ├── package.json
 ├── package-lock.json
 ├── config.json.example
-├── config.json                   (gitignored — contains display IP + PIN)
+├── config.json                   (gitignored — display IP + PIN)
 ├── .expired                      (gitignored — daemon-managed rclone exclude list)
 ├── CLAUDE.md                     Instructions for AI coding assistants
 ├── lib/
