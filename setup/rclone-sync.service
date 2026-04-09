@@ -9,6 +9,7 @@ Type=oneshot
 User=pi
 Group=pi
 ExecStart=/usr/bin/rclone sync gdrive:"Lowertown Display" /home/pi/display-drop \
+  --drive-shared-with-me \
   --exclude-from /home/pi/display-bridge/.expired \
   --log-level INFO
 StandardOutput=journal
