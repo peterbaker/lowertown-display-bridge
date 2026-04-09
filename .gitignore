@@ -6,3 +6,4 @@ drop/
 *.png
 *.bmp
 .env
+.DS_Store
