@@ -19,6 +19,8 @@ Drop an image file into the **"Lowertown Display"** Google Drive folder (`pete@l
 
 **Priority cascade**: Tier 1 > Tier 2 > Tier 3 at any given time slot. Same-tier ties go to the alphabetically first filename.
 
+**Separator**: the `-` between the time token and description can be a dash or a space — `T1100-lunch.jpg` and `T1100 lunch.jpg` are equivalent.
+
 **DOW values**: `MON TUE WED THU FRI SAT SUN` (case-insensitive in filename)
 
 **10-minute gap rule**: Scheduled pushes (tiers 1–3) must be at least 10 minutes apart — the e-paper display takes up to a minute to refresh. Tier-4 immediate pushes bypass this rule.
@@ -83,27 +85,33 @@ sudo tailscale up
 
 Open the printed URL on your Mac/phone to authenticate. Once joined, SSH works from anywhere — no `.local`, no port forwarding needed.
 
-### Set up a dedicated SSH key for the Pi (no passphrase)
+### Set up SSH key auth for the Pi
 
-Create a key specifically for the Pi on your Mac:
+Install your Mac's public key on the Pi:
 
 ```bash
-ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_pi -N "" -C "pete@lowertown-pi"
-ssh-copy-id -i ~/.ssh/id_ed25519_pi.pub pi@lowertown-pi
+ssh-copy-id -i ~/.ssh/id_ed25519 pi@lowertown-pi.local
 ```
 
-Add to `~/.ssh/config` on your Mac:
+Add to `~/.ssh/config` on your Mac (both names work — `lowertown-pi` matches the Tailscale hostname):
 
 ```
-Host lt-pi
+Host lt-pi lowertown-pi
     HostName lowertown-pi
     User pi
-    IdentityFile ~/.ssh/id_ed25519_pi
+    IdentityFile ~/.ssh/id_ed25519
+```
+
+Store the key passphrase in the macOS Keychain so you're never prompted:
+
+```bash
+ssh-add --apple-use-keychain ~/.ssh/id_ed25519
+ssh-add --apple-load-keychain   # load into agent for the current session
 ```
 
 Verify it works with no prompts:
 ```bash
-ssh lt-pi
+ssh lowertown-pi
 ```
 
 ### Disable password auth on the Pi
@@ -386,8 +394,16 @@ sudo systemctl restart display-bridge
 
 ### Update bridge software
 
+From your Mac (one command):
+
 ```bash
-ssh lt-pi
+./deploy.sh
+```
+
+Or manually on the Pi:
+
+```bash
+ssh lowertown-pi
 cd /home/pi/display-bridge
 git pull
 npm ci
@@ -409,6 +425,7 @@ npm ci       # install from lockfile
 
 ```
 ├── bridge.js                     CLI entry point
+├── deploy.sh                     One-command deploy from Mac (git pull + restart)
 ├── package.json
 ├── package-lock.json
 ├── config.json.example

@@ -17,6 +17,8 @@ A Raspberry Pi bridge that syncs images from a Google Drive folder (`pete@lowert
 
 DOW: `MON TUE WED THU FRI SAT SUN` (case-insensitive in filename).
 
+**Separator**: the character between the time token and description can be `-` or a space — `T1100-lunch.jpg` and `T1100 lunch.jpg` parse identically.
+
 **Tie-breaking**: when multiple files compete for the same tier+slot, alphabetically first filename wins.
 
 ### Core modules
@@ -83,11 +85,18 @@ All scheduling uses local `America/Detroit` time. The systemd service sets `TZ=A
 4. `sudo systemctl start display-bridge`
 5. Verify: `node bridge.js network-standby on && node bridge.js status`
 
+## Deploying from Mac
+
+```bash
+./deploy.sh    # git pull + systemctl restart display-bridge, single SSH connection
+```
+
 ## Remote Access
 
-- SSH: `ssh lt-pi` (via Tailscale — works anywhere, no port forwarding)
+- SSH: `ssh lowertown-pi` or `ssh lt-pi` — both work (configured as aliases in `~/.ssh/config`)
 - Hard reboot: TP-Link Kasa smart plug app (if SSH unreachable)
 - If Tailscale offline: power-cycle via Kasa app; Tailscale auto-reconnects
+- If prompted for key passphrase: run `ssh-add --apple-load-keychain` to load from macOS Keychain
 
 ## Operational Commands
 
