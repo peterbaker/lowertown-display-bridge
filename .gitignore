@@ -8,3 +8,4 @@ drop/
 .env
 .DS_Store
 .expired
+.last-push.json
