@@ -62,13 +62,14 @@ switch (command) {
     }
     const { processImage } = await import('./lib/process-image.js');
     const { sendImage } = await import('./lib/display.js');
+    const { persistDisplayHost } = await import('./lib/config-store.js');
     console.log(`Processing ${basename(absPath)}...`);
     const processed = await processImage(absPath, config.images);
     try {
       if (dryRun) {
         console.log(`[DRY RUN] Would push ${basename(absPath)} → ${config.display.host}`);
       } else {
-        await sendImage(processed.path, config.display);
+        await sendImage(processed.path, config.display, { onHostChanged: persistDisplayHost });
       }
     } finally {
       await processed.cleanup();
