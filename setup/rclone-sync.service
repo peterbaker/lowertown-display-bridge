@@ -8,7 +8,11 @@ Wants=network-online.target
 Type=oneshot
 User=pi
 Group=pi
-ExecStart=/usr/bin/rclone sync gdrive:"Lowertown Display" /home/pi/display-drop \
+# flock guards against the 60s timer firing a second rclone while the previous
+# one is still running (slow connection or large transfer). Exit code 75 means
+# "lock held" — declared a clean success so systemd doesn't log it as failure.
+SuccessExitStatus=75
+ExecStart=/usr/bin/flock -n -E 75 /tmp/rclone-sync.lock /usr/bin/rclone sync gdrive:"Lowertown Display" /home/pi/display-drop \
   --drive-shared-with-me \
   --exclude-from /home/pi/display-bridge/.expired \
   --log-level INFO
