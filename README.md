@@ -1,4 +1,6 @@
-# Lowertown Display Bridge
+# Screen Bridge
+
+*Raspberry Pi daemon driving the e-paper display*  ·  `display-bridge`
 
 Raspberry Pi daemon that syncs images from Google Drive and pushes them to the Samsung EM32DX e-paper display at Lowertown Bar & Cafe on a filename-based schedule. Headless; managed remotely via SSH over Tailscale.
 
