@@ -26,6 +26,7 @@ DOW: `MON TUE WED THU FRI SAT SUN` (case-insensitive in filename).
 - `lib/filename.js` — 4-tier regex parser; `parseFilename`, `nextFireTime`, `wasApplicableAt`, `slotKey`, `dateStr`, `todayDow`, `hhmmOf`
 - `lib/registry.js` — file registry; `Registry` class with `add/remove`, `resolveSlot`, `resolveCurrentDisplay`, `allHHMMs`, `filesInSlot`, `expiredDatedFiles`
 - `lib/scheduler.js` — daemon; one `setTimeout` per HHMM slot, gap enforcement (10 min), retry logic (10 min window), midnight rollover, chokidar file watcher
+- `lib/reachability.js` — offline gate; `createReachabilityGate` defers pushes while the display is unpowered and pushes a catch-up the moment TCP 1515 answers
 - `lib/display.js` — `samsung-emdx` + `samsung-mdc` wrappers (already complete)
 - `lib/process-image.js` — `sharp` resize to 1440×2560 portrait with white letterbox (already complete)
 
@@ -34,6 +35,7 @@ DOW: `MON TUE WED THU FRI SAT SUN` (case-insensitive in filename).
 - **One timer per HHMM slot** — cascade resolution (`resolveSlot`) happens at fire time, so late-arriving files compete correctly
 - **10-minute gap** — scheduled pushes must be 10+ minutes apart (enforced at fire time); tier-4 immediate files bypass this
 - **Startup catch-up** — on daemon start, pushes whichever past slot's winner is most recent (handles Pi reboots)
+- **Power-aware pushes** — the wall display is on a power schedule (off overnight, back ~07:45) while slots start at 07:30. A failed send is probed against TCP 1515; if the panel doesn't answer, the bridge enters offline mode, defers pushes instead of hanging 120s on each, and polls every 30s. The first answer triggers an immediate `resolveCurrentDisplay()` push, so the wall updates at power-on, not at the next slot
 - **Midnight rollover** — deletes expired tier-1 files from Pi, adds them to `.expired` so rclone doesn't re-download, rebuilds timers
 - **`--dry-run`** — full pipeline except display send; use for home testing
 

@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-08-31
+
+### Fixed
+- **Bridge waits for display power instead of pushing into a dead panel.** The
+  wall display's power comes on at ~07:45, but LOW-473 moved the Orchestrator's
+  operating window open to 07:30, so slots T0730/T0740 fired while the panel was
+  unpowered. Each attempt cost a flat 120s — `samsung-emdx` has no fast-fail for
+  an unplugged display, and the resulting error carries no `ENETUNREACH`/
+  `ETIMEDOUT` marker for `display.js`'s rediscovery path to recognise. Because a
+  send holds the `sending` lock for that whole window, the 07:40 slot landed on
+  `Busy — skipping` and was lost, and the first real push of the day slipped to
+  07:50.
+
+  New `lib/reachability.js` gate: on a send failure the bridge probes TCP 1515
+  directly (1.5s connect), and if the display doesn't answer it enters offline
+  mode — deferring pushes rather than hanging on them — while polling every 30s.
+  The first successful probe pushes `resolveCurrentDisplay()` immediately, so the
+  wall updates at power-on rather than at the next slot boundary. `sendWithRetry`
+  hands off to the gate instead of burning its 10-minute retry window, and a
+  boot-time probe that finds nothing on the LAN now starts the daemon offline so
+  a restart during the overnight power-off doesn't stall on the startup catch-up.
+
+  Side effect: this also clears the daily ~07:45 "Pi: no display push in NNNm"
+  alert from `display-scheduler/lib/pi-health.js`, which was a true reading of a
+  structurally guaranteed failure.
+
 ## 2026-05-02
 
 Pi-side hardening paired with the orchestrator's reliability work and Mac→Pi
