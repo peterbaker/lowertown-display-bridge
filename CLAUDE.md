@@ -27,6 +27,7 @@ DOW: `MON TUE WED THU FRI SAT SUN` (case-insensitive in filename).
 - `lib/registry.js` — file registry; `Registry` class with `add/remove`, `resolveSlot`, `resolveCurrentDisplay`, `allHHMMs`, `filesInSlot`, `expiredDatedFiles`
 - `lib/scheduler.js` — daemon; one `setTimeout` per HHMM slot, gap enforcement (10 min), retry logic (10 min window), midnight rollover, chokidar file watcher
 - `lib/reachability.js` — offline gate; `createReachabilityGate` defers pushes while the display is unpowered and pushes a catch-up the moment TCP 1515 answers
+- `lib/power-probe-gate.js` — self-disables the post-push MDC power probe after 3 consecutive failures (the EM32DX never answers it)
 - `lib/display.js` — `samsung-emdx` + `samsung-mdc` wrappers (already complete)
 - `lib/process-image.js` — `sharp` resize to 1440×2560 portrait with white letterbox (already complete)
 

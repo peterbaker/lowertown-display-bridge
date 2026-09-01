@@ -26,6 +26,18 @@
   alert from `display-scheduler/lib/pi-health.js`, which was a true reading of a
   structurally guaranteed failure.
 
+- **Post-push power probe stops flooding the journal.** The EM32DX NAKs every
+  `samsung-mdc ... power` call (confirmed directly against the panel), so the
+  probe logged one failure line per push — ~90/day, none actionable. Commit
+  e98a261 tried to quiet it by switching `console.warn` to `console.debug`,
+  but Node's `console.debug` writes to stdout exactly like `console.log` and the
+  unit sets `StandardOutput=journal`, so nothing changed. Volume was the problem,
+  not level. New `lib/power-probe-gate.js` logs the first 3 consecutive failures,
+  then disables the probe for the life of the process with one line explaining
+  why. A success resets the streak, so an intermittent failure never disables it,
+  and hardware that does answer power queries keeps the check. The genuine
+  "sent but panel is in standby" signal is now a real `console.warn` again.
+
 ## 2026-05-02
 
 Pi-side hardening paired with the orchestrator's reliability work and Mac→Pi
