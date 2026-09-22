@@ -10,6 +10,9 @@
  *   node bridge.js status                   Show display device status
  *   node bridge.js discover                 Find displays on local network
  *   node bridge.js network-standby [on|off] Get or set Network Standby on the display
+ *
+ * Config is read from config.json next to this file, or from the path in
+ * DISPLAY_BRIDGE_CONFIG when that is set.
  */
 
 import { readFileSync, existsSync } from 'node:fs';
@@ -20,9 +23,11 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 function loadConfig() {
-  const configPath = join(__dirname, 'config.json');
+  // DISPLAY_BRIDGE_CONFIG lets the tests (and a scratch dry-run) point at a
+  // throwaway config without touching the Pi's real config.json.
+  const configPath = process.env.DISPLAY_BRIDGE_CONFIG || join(__dirname, 'config.json');
   if (!existsSync(configPath)) {
-    console.error('Error: config.json not found.');
+    console.error(`Error: config not found: ${configPath}`);
     console.error('Copy config.json.example → config.json and fill in your display IP and PIN.');
     process.exit(1);
   }
@@ -93,7 +98,7 @@ switch (command) {
       targetDate = new Date(yr, mo - 1, dy, 12, 0, 0); // noon on that date
     }
 
-    const { Registry, isSupported } = await import('./lib/registry.js');
+    const { Registry, isSupported, formatIgnoredSection } = await import('./lib/registry.js');
     const { dateStr, todayDow, hhmmOf } = await import('./lib/filename.js');
 
     const dropDir = resolve(config.images.dir);
@@ -148,6 +153,13 @@ switch (command) {
         const om = registry.getMeta(overridden);
         console.log(`           ↳ overrides: ${basename(overridden)} [${TIER_LABEL[om?.tier]}]`);
       }
+    }
+
+    // Files that will never reach the wall, and the one-line fix for each
+    const ignoredSection = formatIgnoredSection(registry.ignoredFiles());
+    if (ignoredSection) {
+      console.log('');
+      console.log(ignoredSection);
     }
 
     // Show what's currently on the display (catch-up)
