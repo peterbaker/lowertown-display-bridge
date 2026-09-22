@@ -10,7 +10,7 @@ Raspberry Pi daemon that syncs images from Google Drive and pushes them to the S
 
 ## Managing Content
 
-Drop an image into the **"Lowertown Display"** Google Drive folder (account `pete@lowertowna2.com`). Within 60 seconds the Pi picks it up and either pushes it immediately or schedules it based on the filename.
+Drop an image into the **"Lowertown Display"** Google Drive folder (account `pete@lowertowna2.com`). Within 60 seconds the Pi picks it up and schedules it based on the filename. A name that matches no tier is ignored — it is never sent to the wall.
 
 ### Filename scheduling
 
@@ -19,19 +19,31 @@ Drop an image into the **"Lowertown Display"** Google Drive folder (account `pet
 | 1 — One-time | `YYYY-MM-DDTHHMM[-desc].ext` | `2026-05-17T1800-trivia-night.jpg` | Once, on that exact date+time |
 | 2 — Weekly | `DOW-THHMM[-desc].ext` | `MON-T1100-lunch.jpg` | Every Monday at 11:00 AM |
 | 3 — Daily | `THHMM[-desc].ext` | `T1100-lunch.jpg` | Every day at 11:00 AM |
-| 4 — Immediate | *(anything else)* | `spring-menu.jpg` | Pushed the moment it arrives |
+| 4 — Immediate | `NOW-[desc].ext` | `NOW-snow-day-closed.jpg` | **IMMEDIATELY on arrival** — full-screen, needs Pete's approval |
+| — | *anything else* | `spring-menu.jpg` | **Ignored. Never pushed.** Logged with the fix |
 
 - **Priority cascade**: Tier 1 > Tier 2 > Tier 3 at any given slot. Same-tier ties go to the alphabetically first filename.
 - **DOW values**: `MON TUE WED THU FRI SAT SUN` (case-insensitive).
 - **Separator**: dash or space — `T1100-lunch.jpg` and `T1100 lunch.jpg` are equivalent.
 - **10-minute gap**: scheduled pushes (tiers 1–3) must be 10+ min apart (e-paper refresh takes up to a minute). Tier-4 immediate pushes bypass this.
 - **Midnight cleanup**: tier-1 dated files are deleted from the Pi after their date passes. The Drive copy is untouched.
+- **An unrecognised filename is ignored, not pushed.** An immediate takeover is opt-in: the name must start with `NOW-`. Anything else that matches no tier is registered and logged, never sent to the screen.
+- **If your image never appeared, run `node bridge.js schedule` on the Pi and read the Ignored section** before re-uploading.
+- **`Lowertown Display` is a trigger directory, not storage. Nothing goes inside it, at any depth, unless it is meant to appear on the wall.** Both the rclone mirror and the Pi's file watcher are recursive, so a subfolder is exactly as live as the top level. A poster you are not putting on the wall goes to the Drive folder `Lowertown Event Posters` (`1aLCPW0rnJWAcwF0rsil-Pu2V-W2_domn`).
 
 ```
-spring-menu.jpg                    → shows immediately on arrival
+NOW-snow-day-closed.jpg            → shows immediately on arrival
 T1100-lunch.jpg                    → every day at 11:00 AM
 MON-T1100-monday-special.jpg       → every Monday at 11:00 AM (overrides daily)
 2026-05-17T1800-trivia-night.jpg   → May 17 at 6:00 PM only (overrides both)
+spring-menu.jpg                    → ignored, never pushed
+2026-05-17 - Trivia Night.jpg      → ignored (no `T` before the time, so not tier 1)
+```
+
+The daemon logs each ignore with the fix:
+
+```
+[bridge] Ignored (unscheduled filename): spring-menu.jpg — rename with T####/NOW- to schedule it
 ```
 
 ---

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Registry } from '../lib/registry.js';
+import { Registry, formatIgnoredSection } from '../lib/registry.js';
 
 // Helper: build a registry from bare filenames (prefixed with /drop/ to look like real paths)
 function makeRegistry(...names) {
@@ -130,7 +130,7 @@ test('allHHMMs returns sorted unique times across all tiers', () => {
     'T1800-daily.jpg',
     'MON-T1100.jpg',
     '2026-04-13T0900.jpg',
-    'spring-menu.jpg', // tier 4, not slotted
+    'spring-menu.jpg', // ignored, not slotted
   );
   const hhmms = r.allHHMMs();
   assert.deepEqual(hhmms, ['0900', '1100', '1800']);
@@ -191,4 +191,60 @@ test('filesInSlot returns all files competing for a slot', () => {
 test('filesInSlot returns empty for unused slot', () => {
   const r = makeRegistry('T1800.jpg');
   assert.deepEqual(r.filesInSlot('1100'), []);
+});
+
+// ── ignored files (LOW-716) ───────────────────────────────────────────────────
+
+test('ignoredFiles lists unrecognised names and excludes scheduled + NOW- files', () => {
+  const r = makeRegistry(
+    'T1800-daily.jpg',
+    'MON-T1100.jpg',
+    '2026-04-13T0900.jpg',
+    'NOW-snow-day-closed.png',
+    '2026-10-11 - Lowertown Book Club.png',
+    'spring-menu.jpg',
+  );
+  assert.deepEqual(r.ignoredFiles(), [
+    '/drop/2026-10-11 - Lowertown Book Club.png',
+    '/drop/spring-menu.jpg',
+  ]);
+});
+
+test('immediateFiles returns only genuine NOW- files', () => {
+  const r = makeRegistry(
+    'NOW-snow-day-closed.png',
+    'now-test.png',
+    '2026-10-11 - Lowertown Book Club.png',
+    'spring-menu.jpg',
+    'T1800-daily.jpg',
+  );
+  assert.deepEqual(r.immediateFiles().sort(), ['/drop/NOW-snow-day-closed.png', '/drop/now-test.png']);
+});
+
+test('ignored files never win a slot or the current display', () => {
+  const r = makeRegistry('2026-10-11 - Lowertown Book Club.png');
+  assert.deepEqual(r.allHHMMs(), []);
+  assert.equal(r.resolveSlot('1800', MONDAY), null);
+  assert.equal(r.resolveCurrentDisplay(new Date(2026, 3, 13, 23, 59, 0)), null);
+});
+
+test('formatIgnoredSection carries the remedy string literally', () => {
+  const section = formatIgnoredSection([
+    '/drop/spring-menu.jpg',
+    '/drop/2026-10-11 - Lowertown Book Club.png',
+  ]);
+  assert.ok(
+    section.includes('rename with T####/NOW- to schedule it'),
+    `Ignored section must tell the uploader the fix. Got:\n${section}`
+  );
+  assert.equal(
+    section,
+    '  Ignored (never pushed) — rename with T####/NOW- to schedule it:\n' +
+    '    2026-10-11 - Lowertown Book Club.png\n' +
+    '    spring-menu.jpg'
+  );
+});
+
+test('formatIgnoredSection returns null when nothing is ignored', () => {
+  assert.equal(formatIgnoredSection([]), null);
 });

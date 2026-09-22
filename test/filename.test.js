@@ -7,6 +7,9 @@ import {
   slotKey,
   dateStr,
   hhmmOf,
+  isIgnored,
+  ignoreMessage,
+  IGNORE_REMEDY,
 } from '../lib/filename.js';
 
 // ── parseFilename ─────────────────────────────────────────────────────────────
@@ -69,24 +72,87 @@ test('tier 3: parses .bmp', () => {
   assert.equal(m.tier, 3);
 });
 
-test('tier 4: no timestamp prefix', () => {
+test('tier 4: NOW- prefix is immediate', () => {
+  const m = parseFilename('NOW-snow-day-closed.png');
+  assert.equal(m.tier, 4);
+  assert.equal(isIgnored(m), false);
+});
+
+test('tier 4: now- prefix is case-insensitive', () => {
+  const m = parseFilename('now-test.png');
+  assert.equal(m.tier, 4);
+  assert.equal(isIgnored(m), false);
+});
+
+test('tier 4: NOW followed by a space is immediate', () => {
+  const m = parseFilename('NOW closed for a burst pipe.jpg');
+  assert.equal(m.tier, 4);
+});
+
+test('tier 4: NOWHERE is not a NOW- prefix', () => {
+  const m = parseFilename('NOWHERE-to-go.jpg');
+  assert.equal(isIgnored(m), true);
+});
+
+// ── ignored (LOW-716) ─────────────────────────────────────────────────────────
+// A filename matching no tier must never reach the wall. Dropping a poster into
+// the Drive folder used to be an immediate full-screen takeover (LOW-703).
+
+test('ignored: no timestamp prefix', () => {
   const m = parseFilename('spring-menu.jpg');
-  assert.equal(m.tier, 4);
+  assert.deepEqual(m, { tier: null, ignored: true });
 });
 
-test('tier 4: T in middle of name does not trigger tier 3', () => {
+test('ignored: T in middle of name does not trigger tier 3', () => {
   const m = parseFilename('great-T-shirt.jpg');
-  assert.equal(m.tier, 4);
+  assert.equal(isIgnored(m), true);
 });
 
-test('tier 4: MONDAY (full word) does not trigger tier 2', () => {
+test('ignored: MONDAY (full word) does not trigger tier 2', () => {
   const m = parseFilename('MONDAY-special.jpg');
-  assert.equal(m.tier, 4);
+  assert.equal(isIgnored(m), true);
 });
 
-test('tier 4: T18001 (5 digits after T) does not trigger tier 3', () => {
+test('ignored: T18001 (5 digits after T) does not trigger tier 3', () => {
   const m = parseFilename('T18001-ambiguous.jpg');
-  assert.equal(m.tier, 4);
+  assert.equal(isIgnored(m), true);
+});
+
+// The six posters that each took the wall over on arrival (LOW-703).
+const LOW703_POSTERS = [
+  '2026-10-11 - Lowertown Book Club.png',
+  '2026-09-13 - Lowertown Book Club.png',
+  '2026-10-02 - Fall Menu Launch.png',
+  '2026-08-06 - Tour de France Femmes Stage 6 Watch Party.png',
+  '2026-09-03 - Dont Tell Comedy.png',
+  '2026-08-13 - Dont Tell Comedy.png',
+];
+
+for (const name of LOW703_POSTERS) {
+  test(`ignored: LOW-703 poster ${name}`, () => {
+    const m = parseFilename(name);
+    assert.equal(isIgnored(m), true, `${name} must not be schedulable`);
+    assert.equal(m.tier, null);
+    assert.equal(slotKey(m), null);
+    assert.equal(nextFireTime(m), null);
+    assert.equal(wasApplicableAt(m, new Date(2026, 9, 11, 18, 0, 0)), false);
+  });
+}
+
+// ── remedy string ─────────────────────────────────────────────────────────────
+// Load-bearing: it is the only thing that turns "why isn't my image showing?"
+// into a two-second fix. Assert it literally, not by reference.
+
+test('ignore remedy is the literal documented string', () => {
+  assert.equal(IGNORE_REMEDY, 'rename with T####/NOW- to schedule it');
+});
+
+test('ignore log message is the exact documented line', () => {
+  assert.equal(
+    ignoreMessage('2026-10-11 - Lowertown Book Club.png'),
+    'Ignored (unscheduled filename): 2026-10-11 - Lowertown Book Club.png — rename with T####/NOW- to schedule it'
+  );
+  assert.ok(ignoreMessage('x.png').includes('rename with T####/NOW- to schedule it'));
 });
 
 test('tier 1 takes priority over tier 3 prefix match', () => {
@@ -113,6 +179,11 @@ test('slotKey: tier 3', () => {
 });
 
 test('slotKey: tier 4 returns null', () => {
+  const m = parseFilename('NOW-immediate.jpg');
+  assert.equal(slotKey(m), null);
+});
+
+test('slotKey: ignored returns null', () => {
   const m = parseFilename('immediate.jpg');
   assert.equal(slotKey(m), null);
 });
@@ -169,7 +240,7 @@ test('nextFireTime: tier 2 returns today if it is the right DOW and time is futu
 });
 
 test('nextFireTime: tier 4 returns null', () => {
-  const m = parseFilename('immediate.jpg');
+  const m = parseFilename('NOW-immediate.jpg');
   assert.equal(nextFireTime(m), null);
 });
 
@@ -217,6 +288,11 @@ test('wasApplicableAt: tier 3 time not yet passed → false', () => {
 });
 
 test('wasApplicableAt: tier 4 → always false', () => {
+  const m = parseFilename('NOW-immediate.jpg');
+  assert.equal(wasApplicableAt(m, THU_9_PM), false);
+});
+
+test('wasApplicableAt: ignored → always false', () => {
   const m = parseFilename('immediate.jpg');
   assert.equal(wasApplicableAt(m, THU_9_PM), false);
 });
