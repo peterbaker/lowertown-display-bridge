@@ -22,7 +22,7 @@ DOW: `MON TUE WED THU FRI SAT SUN` (case-insensitive in filename). `NOW-` / `NOW
 
 **If your image never appeared, run `node bridge.js schedule` on the Pi and read the Ignored section** before re-uploading.
 
-**`Lowertown Display` is a trigger directory, not storage. Nothing goes inside it, at any depth, unless it is meant to appear on the wall.** Both the rclone mirror and the Pi's file watcher are recursive, so a subfolder is exactly as live as the top level. A poster you are not putting on the wall goes to the Drive folder `Lowertown Event Posters` (`1aLCPW0rnJWAcwF0rsil-Pu2V-W2_domn`).
+**`Lowertown Display` is a trigger directory, not storage. Nothing goes inside it, at any depth, unless it is meant to appear on the wall.** The Pi syncs that one folder as the `display-bridge` service account with `--drive-shared-with-me`, and a subfolder inherits the parent's share while sitting under the synced path — so a subfolder is exactly as live as the top level. A poster you are not putting on the wall goes to the Drive folder `Lowertown Event Posters` (`1aLCPW0rnJWAcwF0rsil-Pu2V-W2_domn`), which is inert because that service account cannot see it and it is not on the sync path. Never share it with that account.
 
 **The remedy string is load-bearing.** The daemon log line and the CLI Ignored section must both contain the literal substring `rename with T####/NOW- to schedule it` — otherwise a misnamed file is a silent no-op for whoever uploaded it. It lives in one place (`IGNORE_REMEDY` in `lib/filename.js`) and is asserted literally in `test/filename.test.js`, `test/registry.test.js`, and `test/ignore-unscheduled.test.js`. Do not reword it.
 

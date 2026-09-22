@@ -29,7 +29,7 @@ Drop an image into the **"Lowertown Display"** Google Drive folder (account `pet
 - **Midnight cleanup**: tier-1 dated files are deleted from the Pi after their date passes. The Drive copy is untouched.
 - **An unrecognised filename is ignored, not pushed.** An immediate takeover is opt-in: the name must start with `NOW-`. Anything else that matches no tier is registered and logged, never sent to the screen.
 - **If your image never appeared, run `node bridge.js schedule` on the Pi and read the Ignored section** before re-uploading.
-- **`Lowertown Display` is a trigger directory, not storage. Nothing goes inside it, at any depth, unless it is meant to appear on the wall.** Both the rclone mirror and the Pi's file watcher are recursive, so a subfolder is exactly as live as the top level. A poster you are not putting on the wall goes to the Drive folder `Lowertown Event Posters` (`1aLCPW0rnJWAcwF0rsil-Pu2V-W2_domn`).
+- **`Lowertown Display` is a trigger directory, not storage. Nothing goes inside it, at any depth, unless it is meant to appear on the wall.** The Pi syncs that one folder as the `display-bridge` service account with `--drive-shared-with-me`, and a subfolder inherits the parent's share while sitting under the synced path — so a subfolder is exactly as live as the top level. A poster you are not putting on the wall goes to the Drive folder `Lowertown Event Posters` (`1aLCPW0rnJWAcwF0rsil-Pu2V-W2_domn`), which is inert because that service account cannot see it and it is not on the sync path. Never share it with that account.
 
 ```
 NOW-snow-day-closed.jpg            → shows immediately on arrival
@@ -375,6 +375,8 @@ rclone config
 # service_account_file: /home/pi/display-bridge/gdrive-key.json
 # advanced: n, auto config: n, team drive: n
 ```
+
+> `--drive-shared-with-me` resolves `gdrive:"Lowertown Display"` **by folder name inside the service account's Shared-with-me listing, not by folder ID.** Two shared folders with that name would make the sync source ambiguous. Keep exactly one folder shared with `display-bridge@lowertown-display-bridge.iam.gserviceaccount.com`, and don't revoke that share — revoking it is what makes the display go dark.
 
 Verify:
 ```bash
