@@ -166,6 +166,39 @@ test('change: re-uploading an ignored file does not push it', async (t) => {
   assert.ok(!text.includes('Would push'), `change path must not push. Log was:\n${text}`);
 });
 
+test('startup: the scan reports how many files it is ignoring, and pushes none', async (t) => {
+  const dropDir = await makeDropDir();
+  // Seeded BEFORE the daemon starts, so these go through the startup scan
+  // rather than the watcher — the post-reboot case.
+  await writeImage(dropDir, POSTER);
+  await writeImage(dropDir, '2026-09-03 - Dont Tell Comedy.png');
+  await writeImage(dropDir, 'T2359-menu.png');
+
+  const bridge = await startCapturing(dropDir);
+  t.after(async () => { await bridge.stop(); await rm(dropDir, { recursive: true, force: true }); });
+
+  const text = bridge.text();
+  assert.ok(
+    text.includes("[bridge] Startup: 2 file(s) ignored (unscheduled filenames) — 'node bridge.js schedule' lists them"),
+    `startup summary missing or reworded. Log was:\n${text}`
+  );
+  assert.ok(text.includes('3 file(s) registered'), 'ignored files are still registered');
+  assert.ok(!text.includes('Would push'), `startup must not push an ignored file. Log was:\n${text}`);
+});
+
+test('startup: no summary line when nothing is ignored', async (t) => {
+  const dropDir = await makeDropDir();
+  await writeImage(dropDir, 'T2359-menu.png');
+
+  const bridge = await startCapturing(dropDir);
+  t.after(async () => { await bridge.stop(); await rm(dropDir, { recursive: true, force: true }); });
+
+  assert.ok(
+    !bridge.text().includes('Startup:'),
+    `a clean drop dir must not log an ignore summary. Log was:\n${bridge.text()}`
+  );
+});
+
 test('tier 1-3 filenames are unaffected — scheduled, not ignored', async (t) => {
   const dropDir = await makeDropDir();
   const bridge = await startCapturing(dropDir);

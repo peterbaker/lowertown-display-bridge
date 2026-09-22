@@ -27,6 +27,15 @@
   [bridge] Ignored (unscheduled filename): spring-menu.jpg — rename with T####/NOW- to schedule it
   ```
 
+  The startup scan reports a count rather than staying silent, so the
+  post-reboot case — a stray file already in the drop dir, someone reading
+  `journalctl` wondering why nothing is showing — isn't the one case the log
+  can't explain:
+
+  ```
+  [bridge] Startup: 2 file(s) ignored (unscheduled filenames) — 'node bridge.js schedule' lists them
+  ```
+
   That substring lives in one place (`IGNORE_REMEDY`) and is asserted literally
   in three test files. `test/ignore-unscheduled.test.js` boots the real daemon in
   dry-run against a scratch drop dir and drives chokidar with real files, so the
