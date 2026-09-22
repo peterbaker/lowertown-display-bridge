@@ -179,9 +179,13 @@ test('startup: the scan reports how many files it is ignoring, and pushes none',
 
   const text = bridge.text();
   assert.ok(
-    text.includes("[bridge] Startup: 2 file(s) ignored (unscheduled filenames) — 'node bridge.js schedule' lists them"),
+    text.includes(
+      "[bridge] Startup: 2 files ignored (unscheduled filenames) — " +
+      "rename with T####/NOW- to schedule it; 'node bridge.js schedule' lists them"
+    ),
     `startup summary missing or reworded. Log was:\n${text}`
   );
+  assert.ok(text.includes(REMEDY), 'the startup line must carry the fix, not only a pointer to it');
   assert.ok(text.includes('3 file(s) registered'), 'ignored files are still registered');
   assert.ok(!text.includes('Would push'), `startup must not push an ignored file. Log was:\n${text}`);
 });

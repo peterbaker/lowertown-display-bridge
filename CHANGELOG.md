@@ -33,7 +33,7 @@
   can't explain:
 
   ```
-  [bridge] Startup: 2 file(s) ignored (unscheduled filenames) — 'node bridge.js schedule' lists them
+  [bridge] Startup: 2 files ignored (unscheduled filenames) — rename with T####/NOW- to schedule it; 'node bridge.js schedule' lists them
   ```
 
   That substring lives in one place (`IGNORE_REMEDY`) and is asserted literally
